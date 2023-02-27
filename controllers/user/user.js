@@ -25,13 +25,57 @@ const addUser = (req,res) =>{
         if(results.rows.length){
             res.send("Email already used !");
         }
+        pool.query(queries.addUser,[first_name, last_name, email, phone, password, address_line1, address_line2, city, zipcode, country],(error,results)=>{
+            if(error) throw error;
+            res.status(201).send("User created successfully!");
+        });
+
         
-    })
-}
+    });
+};
+
+const removetUser =async (req,res) =>{
+    const id = parseInt(req.params.id);
+    pool.query(queries.getUserByID,[id],(error,results)=>{
+        const noUserFound= !results.rows.length;
+        if(noUserFound){
+            res.send("User does not exist");
+        }
+        pool.query(queries.removeUser,[id],(error,results)=>{
+
+            if(error) throw error;
+             res.status(200).send("User deleted sucessfully!");
+            
+           
+        });
+    });
+};
+
+const updateUser =async (req,res) =>{
+    const id = parseInt(req.params.id);
+    const {first_name} =req.body; 
+    pool.query(queries.getUserByID,[id],(error,results)=>{
+        const noUserFound= !results.rows.length;
+        if(noUserFound){
+            res.send("User does not exist");
+        }
+        pool.query(queries.updateUser,[first_name,id],(error,results)=>{
+
+            if(error) throw error;
+            
+             res.status(200).send("User updated sucessfully!");
+            
+           
+        });
+    });
+};
+
 
 module.exports = {
     getAllUsers,
     getUserByID,
     addUser,
+    removetUser,
+    updateUser,
 };
 

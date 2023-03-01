@@ -3,6 +3,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const products_routes = require("./routes/products");
 const users_routes = require("./routes/user/user");
+const brands_routes = require("./routes/brand/brand");
+const categories_routes = require("./routes/categories/categories");
 app.use(express.json());
 
 
@@ -13,6 +15,8 @@ app.get("/",(req,res)=>{
 
 app.use("/api/products",products_routes);
 app.use("/api/v1/users",users_routes);
+app.use("/api/v1/brands",brands_routes);
+app.use("/api/v1/categories",categories_routes);
 
 
 

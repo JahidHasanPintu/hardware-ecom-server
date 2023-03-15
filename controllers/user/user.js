@@ -1,4 +1,4 @@
-const pool = require("../../db");
+const pool = require("../../config/db");
 const queries = require("./userQueries");
 
 const getAllUsers =async (req,res) =>{

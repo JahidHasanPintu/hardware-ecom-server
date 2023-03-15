@@ -1,4 +1,4 @@
-const pool = require("../../db");
+const pool = require("../../config/db");
 const queries = require("./categoriesQueries");
 
 const getAllCategories =async (req,res) =>{
@@ -19,13 +19,14 @@ const getCategoryByID =async (req,res) =>{
 
 
 const addCategory = (req,res) =>{
-    const {cat_name,cat_image} =req.body; 
+    const filePath = req.file.path;
+    const {cat_name,status} =req.body; 
     
     pool.query(queries.checkCategoryExists,[cat_name],(error,results)=>{
         if(results.rows.length){
             res.send("Category already exist !");
         }
-        pool.query(queries.addCategory,[cat_name,cat_image],(error,results)=>{
+        pool.query(queries.addCategory,[cat_name,filePath,status],(error,results)=>{
             if(error) throw error;
             res.status(201).send("Category created successfully!");
         });

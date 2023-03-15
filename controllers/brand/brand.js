@@ -1,4 +1,4 @@
-const pool = require("../../db");
+const pool = require("../../config/db");
 const queries = require("./brandQueries");
 
 const getAllBrands =async (req,res) =>{
@@ -19,13 +19,15 @@ const getBrandByID =async (req,res) =>{
 
 
 const addBrand = (req,res) =>{
-    const {brand_name,brand_image} =req.body; 
+    const {brand_name,brand_image,status} =req.body;
+    const filePath = req.file.path;
+    // console.log(req); 
     
     pool.query(queries.checkBrandExists,[brand_name],(error,results)=>{
         if(results.rows.length){
             res.send("Brand already exist !");
         }
-        pool.query(queries.addBrand,[brand_name,brand_image],(error,results)=>{
+        pool.query(queries.addBrand,[brand_name,filePath,status],(error,results)=>{
             if(error) throw error;
             res.status(201).send("Brand created successfully!");
         });

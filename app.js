@@ -9,6 +9,7 @@ const categories_routes = require("./routes/categories/categories");
 const subcategories_routes = require("./routes/subcategories/subcategories");
 const blogs_routes = require("./routes/blogs/blogs");
 const orders_routes = require("./routes/orders/orders");
+const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 app.use(cors());
 app.use(express.json());
@@ -29,7 +30,8 @@ app.use("/api/v1/orders",orders_routes);
 
 
 
-
+app.use(notFound);
+app.use(errorHandler);
 
 
 const start = async () =>{

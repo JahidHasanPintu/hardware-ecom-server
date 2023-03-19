@@ -126,6 +126,30 @@ const updateUser = async (req, res) => {
   });
 };
 
+const blockUnblock = async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { fullname } = req.body;
+  try {
+    const { rows } = await pool.query(queries.getUserByID, [id]);
+    if (!rows.length) {
+      res.send("User does not exist");
+    } else {
+      const userBlocked = rows[0].isblocked;
+      if (userBlocked) {
+        await pool.query(queries.blockingUser, [false, id]);
+        res.status(200).send("User Unblocked successfully!");
+      } else {
+        await pool.query(queries.blockingUser, [true, id]);
+        res.status(200).send("User Blocked successfully!");
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Internal server error");
+  }
+};
+
+
 
 module.exports = {
   getAllUsers,
@@ -134,5 +158,6 @@ module.exports = {
   removetUser,
   updateUser,
   login,
+  blockUnblock
 };
 

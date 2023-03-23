@@ -31,7 +31,7 @@ const addOrder = (req,res) =>{
     
 };
 
-const removetOrder =async (req,res) =>{
+const removeOrder =async (req,res) =>{
     const id = parseInt(req.params.id);
     pool.query(queries.getOrderByID,[id],(error,results)=>{
         const noOrderFound= !results.rows.length;
@@ -72,7 +72,7 @@ module.exports = {
     getAllOrders,
     getOrderByID,
     addOrder,
-    removetOrder,
+    removeOrder,
     updateOrder,
 };
 

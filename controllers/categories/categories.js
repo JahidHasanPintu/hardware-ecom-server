@@ -1,12 +1,78 @@
 const pool = require("../../config/db");
 const queries = require("./categoriesQueries");
 
-const getAllCategories =async (req,res) =>{
-    pool.query(queries.getAllCategories,(error,results)=>{
-        if(error) throw error;
-        res.status(200).json(results.rows);
-    });
-};
+// const getAllCategories =async (req,res) =>{
+//     pool.query(queries.getAllCategories,(error,results)=>{
+//         if(error) throw error;
+//         res.status(200).json(results.rows);
+//     });
+// };
+
+// const getAllCategories = async (req, res) => {
+//     const { page = 1, limit = 10 } = req.query;
+//     const offset = (page - 1) * limit;
+//     const countQuery = 'SELECT COUNT(*) AS total_count FROM categories';
+//     const dataQuery = 'SELECT * FROM categories ORDER BY cat_id ASC LIMIT $1 OFFSET $2';
+    
+//     try {
+//       // Get total count of categories
+//       const countResult = await pool.query(countQuery);
+//       const totalCount = countResult.rows[0].total_count;
+      
+//       // Get paginated data for categories
+//       const dataResult = await pool.query(dataQuery, [limit, offset]);
+//       const categories = dataResult.rows;
+      
+//       res.status(200).json({
+//         total_count: totalCount,
+//         page_count: Math.ceil(totalCount / limit),
+//         page_number: page,
+//         categories
+//       });
+//     } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ message: 'Server error' });
+//     }
+//   };
+  
+const getAllCategories = async (req, res) => {
+    const { search = '', sort = '', status = '', page = 1, limit = 10 } = req.query;
+    let offset = (page - 1) * limit;
+  
+    let query = `SELECT * FROM categories WHERE cat_name ILIKE '%${search}%'`;
+    if (status) {
+      query += ` AND status = '${status}'`;
+    }
+    if (sort) {
+      query += ` ORDER BY ${sort}`;
+    }
+  
+    const countQuery = `SELECT COUNT(*) FROM categories WHERE cat_name ILIKE '%${search}%'`;
+    if (status) {
+      countQuery += ` AND status = '${status}'`;
+    }
+  
+    try {
+      const result = await pool.query(`${query} LIMIT ${limit} OFFSET ${offset}`);
+      const totalCount = await pool.query(countQuery);
+      const total = totalCount.rows[0].count;
+      const totalPages = Math.ceil(total / limit);
+      const currentPage = parseInt(page);
+  
+      res.status(200).json({
+        categories: result.rows,
+        page: currentPage,
+        totalPages: totalPages,
+        totalItems: total
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  };
+  
+
+
 
 
 const getCategoryByID =async (req,res) =>{
@@ -35,7 +101,7 @@ const addCategory = (req,res) =>{
     });
 };
 
-const removetCategory =async (req,res) =>{
+const removeCategory =async (req,res) =>{
     const id = parseInt(req.params.id);
     pool.query(queries.getCategoryByID,[id],(error,results)=>{
         const noCategoryFound= !results.rows.length;
@@ -76,7 +142,7 @@ module.exports = {
     getAllCategories,
     getCategoryByID,
     addCategory,
-    removetCategory,
+    removeCategory,
     updateCategory,
 };
 

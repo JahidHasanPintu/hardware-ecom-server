@@ -36,7 +36,7 @@ const addBrand = (req,res) =>{
     });
 };
 
-const removetBrand =async (req,res) =>{
+const removeBrand =async (req,res) =>{
     const id = parseInt(req.params.id);
     pool.query(queries.getBrandByID,[id],(error,results)=>{
         const noUserFound= !results.rows.length;
@@ -77,7 +77,7 @@ module.exports = {
     getAllBrands,
     getBrandByID,
     addBrand,
-    removetBrand,
+    removeBrand,
     updateBrand,
 };
 

@@ -34,7 +34,7 @@ const addBlog = (req,res) =>{
     });
 };
 
-const removetBlog =async (req,res) =>{
+const removeBlog =async (req,res) =>{
     const id = parseInt(req.params.id);
     pool.query(queries.getBlogByID,[id],(error,results)=>{
         const noBlogFound= !results.rows.length;
@@ -75,7 +75,7 @@ module.exports = {
     getAllBlogs,
     getBlogByID,
     addBlog,
-    removetBlog,
+    removeBlog,
     updateBlog,
 };
 

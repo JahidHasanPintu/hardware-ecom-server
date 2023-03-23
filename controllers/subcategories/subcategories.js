@@ -34,7 +34,7 @@ const addSubCategory = (req,res) =>{
     });
 };
 
-const removetSubCategory =async (req,res) =>{
+const removeSubCategory =async (req,res) =>{
     const id = parseInt(req.params.id);
     pool.query(queries.getSubCategoryByID,[id],(error,results)=>{
         const noSubCategoryFound= !results.rows.length;
@@ -75,7 +75,7 @@ module.exports = {
     getAllSubCategories,
     getSubCategoryByID,
     addSubCategory,
-    removetSubCategory,
+    removeSubCategory,
     updateSubCategory,
 };
 

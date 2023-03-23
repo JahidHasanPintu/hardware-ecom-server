@@ -90,7 +90,7 @@ const login = (req, res) => {
 
 
 
-const removetUser = async (req, res) => {
+const removeUser = async (req, res) => {
   const id = parseInt(req.params.id);
   pool.query(queries.getUserByID, [id], (error, results) => {
     const noUserFound = !results.rows.length;
@@ -155,7 +155,7 @@ module.exports = {
   getAllUsers,
   getUserByID,
   addUser,
-  removetUser,
+  removeUser,
   updateUser,
   login,
   blockUnblock

@@ -1,13 +1,6 @@
 const pool = require("../../config/db");
 const queries = require("./blogQueries");
 
-// const getAllBlogs =async (req,res) =>{
-//     pool.query(queries.getAllBlogs,(error,results)=>{
-//         if(error) throw error;
-//         res.status(200).json(results.rows);
-//     });
-// };
-
 const getAllBlogs = async (req, res) => {
     const page = req.query.page ? parseInt(req.query.page, 10) : 1; // Current page number
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10; // Number of records to show per page

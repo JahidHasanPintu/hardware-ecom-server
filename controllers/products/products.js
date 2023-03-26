@@ -8,86 +8,89 @@ const queries = require("./productsQueries");
 //     });
 // };
 
-// const getAllProducts = async (req, res) => {
-//     const { search, sort, cat_id, brand_id, subcat_id } = req.query;
-//     let queryString = 'SELECT * FROM products';
-//     let queryParams = [];
-  
-//     if (search) {
-//       queryString += ' WHERE LOWER(name) LIKE $1';
-//       queryParams.push(`%${search.toLowerCase()}%`);
-//     }
-  
-//     if (cat_id) {
-//       queryString += ` WHERE cat_id = $${queryParams.length + 1}`;
-//       queryParams.push(cat_id);
-//     }
-  
-//     if (brand_id) {
-//       queryString += ` WHERE brand_id = $${queryParams.length + 1}`;
-//       queryParams.push(brand_id);
-//     }
-  
-//     if (subcat_id) {
-//       queryString += ` WHERE subcat_id = $${queryParams.length + 1}`;
-//       queryParams.push(subcat_id);
-//     }
-  
-//     if (sort) {
-//       queryString += ` ORDER BY ${sort}`;
-//     }
-  
-//     try {
-//       const { rows } = await pool.query(queryString, queryParams);
-//       res.status(200).json(rows);
-//     } catch (error) {
-//       console.error(error);
-//       res.status(500).json({ message: 'Internal server error' });
-//     }
-//   };
 
-  const getAllProducts = async (req, res) => {
-    const { search, sort, cat_id, brand_id, subcat_id, page = 1, limit = 10 } = req.query;
-    let queryString = 'SELECT * FROM products';
-    let queryParams = [];
-    let offset = (page - 1) * limit;
+
+const getAllProducts = async (req, res) => {
+  const { search, sort, cat_id, brand_id, subcat_id } = req.query;
+  let queryString = 'SELECT p.*, b.brand_name, c.cat_name, s.subcat_name FROM public.products p LEFT JOIN public.brands b ON p.brand_id = b.brand_id LEFT JOIN public.categories c ON p.cat_id = c.cat_id LEFT JOIN public.subcategories s ON p.subcat_id = s.subcat_id';
+  let queryParams = [];
+
+  if (search) {
+    queryString += ' WHERE LOWER(p.name) LIKE $1';
+    queryParams.push(`%${search.toLowerCase()}%`);
+  }
+
+  if (cat_id) {
+    queryString += ` WHERE p.cat_id = $${queryParams.length + 1}`;
+    queryParams.push(cat_id);
+  }
+
+  if (brand_id) {
+    queryString += ` WHERE p.brand_id = $${queryParams.length + 1}`;
+    queryParams.push(brand_id);
+  }
+
+  if (subcat_id) {
+    queryString += ` WHERE p.subcat_id = $${queryParams.length + 1}`;
+    queryParams.push(subcat_id);
+  }
+
+  if (sort) {
+    queryString += ` ORDER BY p.${sort}`;
+  }
+
+  try {
+    const { rows } = await pool.query(queryString, queryParams);
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+  // const getAllProducts = async (req, res) => {
+  //   const { search, sort, cat_id, brand_id, subcat_id, page = 1, limit = 10 } = req.query;
+  //   let queryString = 'SELECT * FROM products';
+  //   let queryParams = [];
+  //   let offset = (page - 1) * limit;
   
-    if (search) {
-      queryString += ' WHERE LOWER(name) LIKE $1';
-      queryParams.push(`%${search.toLowerCase()}%`);
-    }
+  //   if (search) {
+  //     queryString += ' WHERE LOWER(name) LIKE $1';
+  //     queryParams.push(`%${search.toLowerCase()}%`);
+  //   }
   
-    if (cat_id) {
-      queryString += ` WHERE cat_id = $${queryParams.length + 1}`;
-      queryParams.push(cat_id);
-    }
+  //   if (cat_id) {
+  //     queryString += ` WHERE cat_id = $${queryParams.length + 1}`;
+  //     queryParams.push(cat_id);
+  //   }
   
-    if (brand_id) {
-      queryString += ` WHERE brand_id = $${queryParams.length + 1}`;
-      queryParams.push(brand_id);
-    }
+  //   if (brand_id) {
+  //     queryString += ` WHERE brand_id = $${queryParams.length + 1}`;
+  //     queryParams.push(brand_id);
+  //   }
   
-    if (subcat_id) {
-      queryString += ` WHERE subcat_id = $${queryParams.length + 1}`;
-      queryParams.push(subcat_id);
-    }
+  //   if (subcat_id) {
+  //     queryString += ` WHERE subcat_id = $${queryParams.length + 1}`;
+  //     queryParams.push(subcat_id);
+  //   }
   
-    if (sort) {
-      queryString += ` ORDER BY ${sort}`;
-    }
+  //   if (sort) {
+  //     queryString += ` ORDER BY ${sort}`;
+  //   }
   
-    queryString += ' LIMIT $1 OFFSET $2';
-    queryParams.unshift(limit);
-    queryParams.unshift(offset);
+  //   queryString += ' LIMIT $1 OFFSET $2';
+  //   queryParams.unshift(limit);
+  //   queryParams.unshift(offset);
   
-    try {
-      const { rows } = await pool.query(queryString, queryParams);
-      res.status(200).json(rows);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  };
+  //   try {
+  //     const { rows } = await pool.query(queryString, queryParams);
+  //     res.status(200).json(rows);
+  //   } catch (error) {
+  //     console.error(error);
+  //     res.status(500).json({ message: 'Internal server error' });
+  //   }
+  // };
   
   
 

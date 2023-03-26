@@ -5,10 +5,67 @@ const queries = require("./userQueries");
 const { generateToken } = require("../../config/jwtToken");
 
 const getAllUsers = async (req, res) => {
-  pool.query(queries.getAllUsers, (error, results) => {
-    if (error) throw error;
-    res.status(200).json(results.rows);
-  });
+  const page = req.query.page ? parseInt(req.query.page, 10) : 1; // Current page number
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10; // Number of records to show per page
+  const offset = (page - 1) * limit; // Offset to skip the previous pages
+
+  const { search, isblocked, role } = req.query;
+
+  let query = `
+    SELECT *
+    FROM users
+  `;
+
+  const values = [];
+
+  // If search query parameter is provided, add WHERE clause to search by fullname, email, and phone
+  if (search) {
+    query += `
+      WHERE fullname ILIKE $${values.length + 1}
+        OR email ILIKE $${values.length + 2}
+        OR phone::text ILIKE $${values.length + 3}
+    `;
+    values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  // If isblocked query parameter is provided, add WHERE clause to filter by isblocked
+  if (isblocked) {
+    query += `
+      ${search ? "AND" : "WHERE"} isblocked = $${values.length + 1}
+    `;
+    values.push(isblocked);
+  }
+
+  // If role query parameter is provided, add WHERE clause to filter by role
+  if (role) {
+    query += `
+      ${search || isblocked ? "AND" : "WHERE"} role = $${values.length + 1}
+    `;
+    values.push(role);
+  }
+
+  query += `
+    ORDER BY id ASC
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
+  `;
+  values.push(limit, offset);
+
+  try {
+    const result = await pool.query(query, values);
+    const users = result.rows;
+
+    res.status(200).json({
+      success: true,
+      page,
+      limit,
+      total: users.length,
+      data: users,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
 };
 
 

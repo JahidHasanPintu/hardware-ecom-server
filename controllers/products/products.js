@@ -7,7 +7,7 @@ const getAllProducts = async (req, res) => {
   const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10; // Number of records to show per page
   const offset = (page - 1) * limit; // Offset to skip the previous pages
 
-  const { search, brand_id, cat_id } = req.query;
+  const { search, brand_id, cat_id, subcat_id } = req.query;
 
   let query = `
     SELECT *
@@ -40,6 +40,12 @@ const getAllProducts = async (req, res) => {
     values.push(cat_id);
   }
 
+  if (subcat_id) {
+    query += `
+      ${search || brand_id || cat_id ? "AND" : "WHERE"} subcat_id = $${values.length + 1}
+    `;
+    values.push(subcat_id);
+  }
   query += `
     ORDER BY id ASC
     LIMIT $${values.length + 1}

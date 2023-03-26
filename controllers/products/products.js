@@ -1,98 +1,70 @@
 const pool = require("../../config/db");
 const queries = require("./productsQueries");
 
-// const getAllProducts =async (req,res) =>{
-//     pool.query(queries.getAllProducts,(error,results)=>{
-//         if(error) throw error;
-//         res.status(200).json(results.rows);
-//     });
-// };
-
-
 
 const getAllProducts = async (req, res) => {
-  const { search, sort, cat_id, brand_id, subcat_id } = req.query;
-  let queryString = 'SELECT p.*, b.brand_name, c.cat_name, s.subcat_name FROM public.products p LEFT JOIN public.brands b ON p.brand_id = b.brand_id LEFT JOIN public.categories c ON p.cat_id = c.cat_id LEFT JOIN public.subcategories s ON p.subcat_id = s.subcat_id';
-  let queryParams = [];
+  const page = req.query.page ? parseInt(req.query.page, 10) : 1; // Current page number
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10; // Number of records to show per page
+  const offset = (page - 1) * limit; // Offset to skip the previous pages
 
+  const { search, brand_id, cat_id } = req.query;
+
+  let query = `
+    SELECT *
+    FROM products
+  `;
+
+  const values = [];
+
+  // If search query parameter is provided, add WHERE clause to search by name
   if (search) {
-    queryString += ' WHERE LOWER(p.name) LIKE $1';
-    queryParams.push(`%${search.toLowerCase()}%`);
+    query += `
+      WHERE name ILIKE $${values.length + 1}
+    `;
+    values.push(`%${search}%`);
   }
 
-  if (cat_id) {
-    queryString += ` WHERE p.cat_id = $${queryParams.length + 1}`;
-    queryParams.push(cat_id);
-  }
-
+  // If brand_id query parameter is provided, add WHERE clause to filter by brand_id
   if (brand_id) {
-    queryString += ` WHERE p.brand_id = $${queryParams.length + 1}`;
-    queryParams.push(brand_id);
+    query += `
+      ${search ? "AND" : "WHERE"} brand_id = $${values.length + 1}
+    `;
+    values.push(brand_id);
   }
 
-  if (subcat_id) {
-    queryString += ` WHERE p.subcat_id = $${queryParams.length + 1}`;
-    queryParams.push(subcat_id);
+  // If cat_id query parameter is provided, add WHERE clause to filter by cat_id
+  if (cat_id) {
+    query += `
+      ${search || brand_id ? "AND" : "WHERE"} cat_id = $${values.length + 1}
+    `;
+    values.push(cat_id);
   }
 
-  if (sort) {
-    queryString += ` ORDER BY p.${sort}`;
-  }
+  query += `
+    ORDER BY id ASC
+    LIMIT $${values.length + 1}
+    OFFSET $${values.length + 2}
+  `;
+  values.push(limit, offset);
 
   try {
-    const { rows } = await pool.query(queryString, queryParams);
-    res.status(200).json(rows);
+    const result = await pool.query(query, values);
+    const products = result.rows;
+
+    res.status(200).json({
+      success: true,
+      page,
+      limit,
+      total: products.length,
+      data: products,
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
-
-  // const getAllProducts = async (req, res) => {
-  //   const { search, sort, cat_id, brand_id, subcat_id, page = 1, limit = 10 } = req.query;
-  //   let queryString = 'SELECT * FROM products';
-  //   let queryParams = [];
-  //   let offset = (page - 1) * limit;
-  
-  //   if (search) {
-  //     queryString += ' WHERE LOWER(name) LIKE $1';
-  //     queryParams.push(`%${search.toLowerCase()}%`);
-  //   }
-  
-  //   if (cat_id) {
-  //     queryString += ` WHERE cat_id = $${queryParams.length + 1}`;
-  //     queryParams.push(cat_id);
-  //   }
-  
-  //   if (brand_id) {
-  //     queryString += ` WHERE brand_id = $${queryParams.length + 1}`;
-  //     queryParams.push(brand_id);
-  //   }
-  
-  //   if (subcat_id) {
-  //     queryString += ` WHERE subcat_id = $${queryParams.length + 1}`;
-  //     queryParams.push(subcat_id);
-  //   }
-  
-  //   if (sort) {
-  //     queryString += ` ORDER BY ${sort}`;
-  //   }
-  
-  //   queryString += ' LIMIT $1 OFFSET $2';
-  //   queryParams.unshift(limit);
-  //   queryParams.unshift(offset);
-  
-  //   try {
-  //     const { rows } = await pool.query(queryString, queryParams);
-  //     res.status(200).json(rows);
-  //   } catch (error) {
-  //     console.error(error);
-  //     res.status(500).json({ message: 'Internal server error' });
-  //   }
-  // };
-  
-  
+ 
 
 const getProductByID =async (req,res) =>{
     const id = parseInt(req.params.id);

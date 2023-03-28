@@ -41,13 +41,20 @@ const getAllBrands = async (req, res) => {
     try {
       const result = await pool.query(query, values);
       const brands = result.rows;
+      const data = brands.map((brand) => ({
+        brand_id: brand.brand_id,
+        brand_name: brand.brand_name,
+        brand_image: process.env.BASE_URL + "/" + brand.brand_image,
+        status: brand.status,
+      }));
+      
   
       res.status(200).json({
         success: true,
         page,
         limit,
         total: brands.length,
-        data: brands,
+        data: data,
       });
     } catch (error) {
       console.error(error);
@@ -66,8 +73,8 @@ const getBrandByID =async (req,res) =>{
 
 
 const addBrand = (req,res) =>{
-    const {brand_name,brand_image,status} =req.body;
-    const filePath = req.file.path;
+    const {brand_name,status} =req.body;
+    const filePath = req.file.path.replace("public\\", "");
     // console.log(req); 
     
     pool.query(queries.checkBrandExists,[brand_name],(error,results)=>{
@@ -87,37 +94,42 @@ const removeBrand =async (req,res) =>{
     const id = parseInt(req.params.id);
     pool.query(queries.getBrandByID,[id],(error,results)=>{
         const noUserFound= !results.rows.length;
-        if(noUserFound){
-            res.send("Brand does not exist");
+        if (noUserFound) {
+          res.status(404).json({ message: "Brand does not exist" });
         }
-        pool.query(queries.removeBrand,[id],(error,results)=>{
-
-            if(error) throw error;
-             res.status(200).send("Brand deleted sucessfully!");
-            
-           
+        pool.query(queries.removeBrand, [id], (error, results) => {
+          if (error) throw error;
+          res.status(200).json({ message: "Brand deleted successfully!" });
         });
     });
 };
 
-const updateBrand =async (req,res) =>{
-    const id = parseInt(req.params.id);
-    const {brand_name} =req.body; 
-    pool.query(queries.getBrandByID,[id],(error,results)=>{
-        const noUserFound= !results.rows.length;
-        if(noUserFound){
-            res.send("Brand does not exist");
-        }
-        pool.query(queries.updateBrand,[brand_name,id],(error,results)=>{
-
-            if(error) throw error;
-            
-             res.status(200).send("Brand updated sucessfully!");
-            
-           
-        });
-    });
+const updateBrand = async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { brand_name, status } = req.body;
+  let brand_image;
+  if (req.file) {
+    brand_image = req.file.path.replace("public\\", "");
+  } else {
+    const result = await pool.query(queries.getBrandByID, [id]);
+    brand_image = result.rows[0].brand_image;
+  }
+  pool.query(queries.getBrandByID, [id], (error, results) => {
+    const noUserFound = !results.rows.length;
+    if (noUserFound) {
+      res.send("Brand does not exist");
+    }
+    pool.query(
+      queries.updateBrand,
+      [brand_name, brand_image, status, id],
+      (error, results) => {
+        if (error) throw error;
+        res.status(200).send("Brand updated successfully!");
+      }
+    );
+  });
 };
+
 
 
 module.exports = {

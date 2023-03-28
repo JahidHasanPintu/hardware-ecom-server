@@ -10,9 +10,16 @@ const getAllProducts = async (req, res) => {
   const { search, brand_id, cat_id, subcat_id } = req.query;
 
   let query = `
-    SELECT *
-    FROM products
-  `;
+    SELECT p.*, 
+      b.brand_name, 
+      c.cat_name, 
+      s.subcat_name 
+    FROM 
+      public.products p 
+      LEFT JOIN public.brands b ON p.brand_id = b.brand_id 
+      LEFT JOIN public.categories c ON p.cat_id = c.cat_id 
+      LEFT JOIN public.subcategories s ON p.subcat_id = s.subcat_id
+    `;
 
   const values = [];
 
@@ -27,7 +34,7 @@ const getAllProducts = async (req, res) => {
   // If brand_id query parameter is provided, add WHERE clause to filter by brand_id
   if (brand_id) {
     query += `
-      ${search ? "AND" : "WHERE"} brand_id = $${values.length + 1}
+      ${search ? "AND" : "WHERE"} p.brand_id = $${values.length + 1}
     `;
     values.push(brand_id);
   }
@@ -35,14 +42,14 @@ const getAllProducts = async (req, res) => {
   // If cat_id query parameter is provided, add WHERE clause to filter by cat_id
   if (cat_id) {
     query += `
-      ${search || brand_id ? "AND" : "WHERE"} cat_id = $${values.length + 1}
+      ${search || brand_id ? "AND" : "WHERE"} p.cat_id = $${values.length + 1}
     `;
     values.push(cat_id);
   }
 
   if (subcat_id) {
     query += `
-      ${search || brand_id || cat_id ? "AND" : "WHERE"} subcat_id = $${values.length + 1}
+      ${search || brand_id || cat_id ? "AND" : "WHERE"} p.subcat_id = $${values.length + 1}
     `;
     values.push(subcat_id);
   }
@@ -69,6 +76,92 @@ const getAllProducts = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
+// const getAllProducts = async (req, res) => {
+//   const currentPageNumber = req.query.page ? parseInt(req.query.page, 10) : 1; // The current page number
+//   const recordsPerPage = req.query.limit ? parseInt(req.query.limit, 10) : 10; // The number of records to show per page
+//   const recordsToSkip = (currentPageNumber - 1) * recordsPerPage; // The number of records to skip to get to the current page
+
+//   const { searchQuery, brandId, categoryId, subcategoryId } = req.query; // Destructure the query parameters
+
+//   let query = `
+//     SELECT 
+//       p.*, 
+//       b.brand_name, 
+//       c.cat_name, 
+//       s.subcat_name 
+//     FROM 
+//       public.products p 
+//       LEFT JOIN public.brands b ON p.brand_id = b.brand_id 
+//       LEFT JOIN public.categories c ON p.cat_id = c.cat_id 
+//       LEFT JOIN public.subcategories s ON p.subcat_id = s.subcat_id
+//   `;
+
+//   const values = [];
+
+//   // If the search query parameter is provided, add a WHERE clause to search by name
+//   if (searchQuery) {
+//     query += `
+//       WHERE 
+//         name ILIKE $${values.length + 1}
+//     `;
+//     values.push(`%${searchQuery}%`);
+//   }
+
+//   // If the brand ID query parameter is provided, add a WHERE clause to filter by brand ID
+//   if (brandId) {
+//     query += `
+//       ${searchQuery ? "AND" : "WHERE"} 
+//         brand_id = $${values.length + 1}
+//     `;
+//     values.push(brandId);
+//   }
+
+//   // If the category ID query parameter is provided, add a WHERE clause to filter by category ID
+//   if (categoryId) {
+//     query += `
+//       ${searchQuery || brandId ? "AND" : "WHERE"} 
+//         cat_id = $${values.length + 1}
+//     `;
+//     values.push(categoryId);
+//   }
+
+//   // If the subcategory ID query parameter is provided, add a WHERE clause to filter by subcategory ID
+//   if (subcategoryId) {
+//     query += `
+//       ${searchQuery || brandId || categoryId ? "AND" : "WHERE"} 
+//         subcat_id = $${values.length + 1}
+//     `;
+//     values.push(subcategoryId);
+//   }
+
+//   // Add an ORDER BY clause to sort the results by ID in ascending order, and a LIMIT and OFFSET clause to limit the number of results returned to a specific page
+//   query += `
+//     ORDER BY 
+//       id ASC
+//     LIMIT 
+//       $${values.length + 1}
+//     OFFSET 
+//       $${values.length + 2}
+//   `;
+//   values.push(recordsPerPage, recordsToSkip);
+
+//   try {
+//     const result = await pool.query(query, values);
+//     const products = result.rows;
+
+//     res.status(200).json({
+//       success: true,
+//       currentPageNumber,
+//       recordsPerPage,
+//       totalRecords: products.length,
+//       data: products,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ success: false, message: "Internal Server Error" });
+//   }
+// };
 
  
 

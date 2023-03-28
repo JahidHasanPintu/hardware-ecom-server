@@ -41,13 +41,20 @@ const getAllCategories = async (req, res) => {
     try {
       const result = await pool.query(query, values);
       const categories = result.rows;
+
+      const data = categories.map((cat) => ({
+        cat_id: cat.cat_id,
+        cat_name: cat.cat_name,
+        cat_image: process.env.BASE_URL + "/" + cat.cat_image,
+        status: cat.status,
+      }));
   
       res.status(200).json({
         success: true,
         page,
         limit,
         total: categories.length,
-        data: categories,
+        data: data,
       });
     } catch (error) {
       console.error(error);
@@ -66,8 +73,8 @@ const getCategoryByID =async (req,res) =>{
 
 
 const addCategory = (req,res) =>{
-    const filePath = req.file.path;
     const {cat_name,status} =req.body; 
+    const filePath = req.file.path.replace("public\\", "");
     
     pool.query(queries.checkCategoryExists,[cat_name],(error,results)=>{
         if(results.rows.length){
@@ -92,7 +99,7 @@ const removeCategory =async (req,res) =>{
         pool.query(queries.removeCategory,[id],(error,results)=>{
 
             if(error) throw error;
-             res.status(200).send("Category deleted sucessfully!");
+             res.status(200).json({ message: "Category deleted successfully!" });
             
            
         });
@@ -101,13 +108,21 @@ const removeCategory =async (req,res) =>{
 
 const updateCategory =async (req,res) =>{
     const id = parseInt(req.params.id);
-    const {cat_name} =req.body; 
+    const {cat_name,status} =req.body; 
+    if (req.file) {
+      cat_image = req.file.path.replace("public\\", "");
+    } else {
+      const result = await pool.query(queries.getCategoryByID, [id]);
+      cat_image = result.rows[0].cat_image;
+    }
+
+
     pool.query(queries.getCategoryByID,[id],(error,results)=>{
         const noCategoryFound= !results.rows.length;
         if(noCategoryFound){
             res.send("Category does not exist");
         }
-        pool.query(queries.updateCategory,[cat_name,id],(error,results)=>{
+        pool.query(queries.updateCategory,[cat_name,cat_image,status, id],(error,results)=>{
 
             if(error) throw error;
             

@@ -9,6 +9,6 @@ router.route("/").get(getAllCategories);
 router.route("/create").post(upload.single('cat_image'),addCategory);
 router.route("/:id").get(getCategoryByID);
 router.route("/:id").delete(removeCategory);
-router.route("/:id").put(updateCategory) ;
+router.route("/:id").put(upload.single('cat_image'),updateCategory) ;
 
 module.exports = router;

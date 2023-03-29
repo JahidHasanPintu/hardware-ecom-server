@@ -107,12 +107,26 @@ const removeBrand =async (req,res) =>{
 const updateBrand = async (req, res) => {
   const id = parseInt(req.params.id);
   const { brand_name, status } = req.body;
+  const result = await pool.query(queries.getBrandByID, [id]);
   let brand_image;
+  let newBrandName;
+  let newStatus;
   if (req.file) {
     brand_image = req.file.path.replace("public\\", "");
   } else {
-    const result = await pool.query(queries.getBrandByID, [id]);
+    
     brand_image = result.rows[0].brand_image;
+  }
+  if (brand_name) {
+   newBrandName =brand_name;
+  } else {
+    
+    newBrandName = result.rows[0].brand_name;
+  }
+  if (status) {
+    newStatus=status;
+  } else {
+    newStatus = result.rows[0].status;
   }
   pool.query(queries.getBrandByID, [id], (error, results) => {
     const noUserFound = !results.rows.length;
@@ -121,7 +135,7 @@ const updateBrand = async (req, res) => {
     }
     pool.query(
       queries.updateBrand,
-      [brand_name, brand_image, status, id],
+      [newBrandName, brand_image, newStatus, id],
       (error, results) => {
         if (error) throw error;
         res.status(200).send("Brand updated successfully!");

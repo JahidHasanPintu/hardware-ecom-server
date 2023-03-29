@@ -10,8 +10,12 @@ const getAllSubCategories = async (req, res) => {
     const { search, status, cat_id } = req.query;
   
     let query = `
-      SELECT *
-      FROM subcategories
+    SELECT s.*, 
+    c.cat_name
+     
+  FROM 
+    public.subcategories s 
+    LEFT JOIN public.categories c ON s.cat_id = c.cat_id 
     `;
   
     const values = [];
@@ -35,7 +39,7 @@ const getAllSubCategories = async (req, res) => {
     // If cat_id query parameter is provided, add WHERE clause to filter by cat_id
     if (cat_id) {
       query += `
-        ${search || status ? "AND" : "WHERE"} cat_id = $${values.length + 1}
+        ${search || status ? "AND" : "WHERE"} s.cat_id = $${values.length + 1}
       `;
       values.push(cat_id);
     }

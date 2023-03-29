@@ -108,13 +108,30 @@ const removeCategory =async (req,res) =>{
 
 const updateCategory =async (req,res) =>{
     const id = parseInt(req.params.id);
-    const {cat_name,status} =req.body; 
+    const {cat_name,status} =req.body;
+    const result = await pool.query(queries.getCategoryByID, [id]);
+    let cat_image; 
+    let newCatName;
+    let newStatus;
     if (req.file) {
       cat_image = req.file.path.replace("public\\", "");
+      console.log(cat_image);
     } else {
-      const result = await pool.query(queries.getCategoryByID, [id]);
+      
       cat_image = result.rows[0].cat_image;
     }
+    
+  if (cat_name) {
+    newCatName =cat_name;
+   } else {
+     
+     newCatName = result.rows[0].cat_name;
+   }
+   if (status) {
+     newStatus=status;
+   } else {
+     newStatus = result.rows[0].status;
+   }
 
 
     pool.query(queries.getCategoryByID,[id],(error,results)=>{
@@ -122,7 +139,7 @@ const updateCategory =async (req,res) =>{
         if(noCategoryFound){
             res.send("Category does not exist");
         }
-        pool.query(queries.updateCategory,[cat_name,cat_image,status, id],(error,results)=>{
+        pool.query(queries.updateCategory,[newCatName,cat_image,newStatus, id],(error,results)=>{
 
             if(error) throw error;
             

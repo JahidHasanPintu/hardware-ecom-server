@@ -38,6 +38,11 @@ const getAllCategories = async (req, res) => {
     `;
     values.push(limit, offset);
   
+    const totalCountQuery = `
+    SELECT COUNT(*) as total_count
+    FROM categories
+  `;
+  
     try {
       const result = await pool.query(query, values);
       const categories = result.rows;
@@ -48,12 +53,16 @@ const getAllCategories = async (req, res) => {
         cat_image: process.env.BASE_URL + "/" + cat.cat_image,
         status: cat.status,
       }));
+
+      const totalCountResult = await pool.query(totalCountQuery);
+      const totalCount = parseInt(totalCountResult.rows[0].total_count, 10);
   
       res.status(200).json({
         success: true,
         page,
         limit,
         total: categories.length,
+        totalItem: totalCount,
         data: data,
       });
     } catch (error) {
@@ -115,7 +124,6 @@ const updateCategory =async (req,res) =>{
     let newStatus;
     if (req.file) {
       cat_image = req.file.path.replace("public\\", "");
-      console.log(cat_image);
     } else {
       
       cat_image = result.rows[0].cat_image;

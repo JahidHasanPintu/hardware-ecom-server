@@ -38,6 +38,11 @@ const getAllBrands = async (req, res) => {
     `;
     values.push(limit, offset);
   
+    const totalCountQuery = `
+    SELECT COUNT(*) as total_count
+    FROM brands
+  `;
+
     try {
       const result = await pool.query(query, values);
       const brands = result.rows;
@@ -47,6 +52,9 @@ const getAllBrands = async (req, res) => {
         brand_image: process.env.BASE_URL + "/" + brand.brand_image,
         status: brand.status,
       }));
+
+      const totalCountResult = await pool.query(totalCountQuery);
+      const totalCount = parseInt(totalCountResult.rows[0].total_count, 10);
       
   
       res.status(200).json({
@@ -54,6 +62,7 @@ const getAllBrands = async (req, res) => {
         page,
         limit,
         total: brands.length,
+        totalItem: totalCount,
         data: data,
       });
     } catch (error) {

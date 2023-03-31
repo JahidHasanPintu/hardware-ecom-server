@@ -154,16 +154,13 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    const updatedName = name ;
-    const updatedDescription = description;
-    const updatedPrice = price ;
-    const updatedQuantity = quantity ;
-    const updatedCatId = cat_id ;
-    const updatedBrandId = brand_id ;
-    const updatedSubcatId = subcat_id;
-
-
-    console.log(updatedName, updatedDescription, updatedPrice, updatedQuantity, updatedCatId, updatedBrandId, updatedSubcatId);
+    const updatedName = name || existingProduct.name;
+    const updatedDescription = description|| existingProduct.description;
+    const updatedPrice = price || existingProduct.price;
+    const updatedQuantity = quantity || existingProduct.quantity;
+    const updatedCatId = cat_id || existingProduct.cat_id;
+    const updatedBrandId = brand_id || existingProduct.brand_id;
+    const updatedSubcatId = subcat_id|| existingProduct.subcat_id;
 
     const updateQuery = `
       UPDATE products

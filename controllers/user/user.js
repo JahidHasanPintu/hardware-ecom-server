@@ -50,16 +50,22 @@ const getAllUsers = async (req, res) => {
     OFFSET $${values.length + 2}
   `;
   values.push(limit, offset);
-
+  const totalCountQuery = `
+  SELECT COUNT(*) as total_count
+  FROM users
+`;
   try {
     const result = await pool.query(query, values);
     const users = result.rows;
+    const totalCountResult = await pool.query(totalCountQuery);
+    const totalCount = parseInt(totalCountResult.rows[0].total_count, 10);
 
     res.status(200).json({
       success: true,
       page,
       limit,
       total: users.length,
+      totalItem: totalCount,
       data: users,
     });
   } catch (error) {
@@ -79,7 +85,11 @@ const getUserByID = async (req, res) => {
 
 
 const addUser = (req, res) => {
-  const { fullname, email, phone, password, address, city, zipcode, country } = req.body;
+  const { fullname, email, phone, password, address, city, zipcode, country,isblocked,role } = req.body;
+
+  if (req.file) {
+    const filePath = req.file.path.replace("public\\", "");
+  }
 
   pool.query(queries.checkEmailExists, [email], (error, results) => {
     if (results.rows.length) {
@@ -91,7 +101,7 @@ const addUser = (req, res) => {
           res.status(500).send('Internal server error');
         } else {
           pool.query(
-            queries.addUser, [fullname, email, phone, hash, address, city, zipcode, country],
+            queries.addUser, [fullname, email, phone, hash, address, city, zipcode, country,isblocked,role],
             (error, results) => {
               if (error) throw error;
               res.status(201).send('User created successfully!');
@@ -157,7 +167,7 @@ const removeUser = async (req, res) => {
     pool.query(queries.removeUser, [id], (error, results) => {
 
       if (error) throw error;
-      res.status(200).send("User deleted sucessfully!");
+      res.status(200).json({ success: true, message: "User deleted sucessdully" });
 
 
     });

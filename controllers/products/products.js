@@ -66,9 +66,26 @@ const getAllProducts = async (req, res) => {
 `;
   try {
     const result = await pool.query(query, values);
-    const products = result.rows;
+    const data = result.rows;
     const totalCountResult = await pool.query(totalCountQuery);
     const totalCount = parseInt(totalCountResult.rows[0].total_count, 10);
+
+    const products = data.map((product) => ({
+      brand_id: product.brand_id,
+      brand_name: product.brand_name,
+      cat_id: product.cat_id,
+      cat_name: product.cat_name,
+
+      created_at: product.created_at,
+      description: product.description,
+      id: product.id,
+      images: product.images.map((image) => process.env.BASE_URL + "/" + image),
+      name: product.name,
+      price: product.price,
+      quantity: product.quantity,
+      subcat_id: product.subcat_id,
+      subcat_name: product.subcat_name,
+    }));
 
 
     res.status(200).json({
@@ -155,12 +172,12 @@ const updateProduct = async (req, res) => {
     }
 
     const updatedName = name || existingProduct.name;
-    const updatedDescription = description|| existingProduct.description;
+    const updatedDescription = description || existingProduct.description;
     const updatedPrice = price || existingProduct.price;
     const updatedQuantity = quantity || existingProduct.quantity;
     const updatedCatId = cat_id || existingProduct.cat_id;
     const updatedBrandId = brand_id || existingProduct.brand_id;
-    const updatedSubcatId = subcat_id|| existingProduct.subcat_id;
+    const updatedSubcatId = subcat_id || existingProduct.subcat_id;
 
     const updateQuery = `
       UPDATE products

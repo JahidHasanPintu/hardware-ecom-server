@@ -55,30 +55,145 @@ const getAllBlogs = async (req, res) => {
     }
   };
 
-const getBlogByID =async (req,res) =>{
-    const id = parseInt(req.params.id);
-    pool.query(queries.getBlogByID,[id],(error,results)=>{
-        if(error) throw error;
-        res.status(200).json(results.rows);
-    });
+// const getBlogByID =async (req,res) =>{
+//     const id = parseInt(req.params.id);
+//     pool.query(queries.getBlogByID,[id],(error,results)=>{
+//         if(error) throw error;
+//         res.status(200).json(results.rows);
+//     });
+// };
+
+const getBlogByID = (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const getBlogByIDQuery = `
+    SELECT *
+    FROM blogs
+    WHERE id = 1;
+  `;
+
+  pool.query(getBlogByIDQuery, [id], (error, results) => {
+    if (error) throw error;
+    res.status(200).json(results);
+  });
 };
 
 
-const addBlog = (req,res) =>{
-    const {title,details,blog_images} =req.body; 
-    
-    pool.query(queries.checkBlogExists,[title],(error,results)=>{
-        if(results.rows.length){
-            res.send("Blog already exist !");
-        }
-        pool.query(queries.addBlog,[title,details,blog_images],(error,results)=>{
-            if(error) throw error;
-            res.status(201).send("Blog created successfully!");
+
+// const addBlog = (req, res) => {
+//   const { title, details, blog_images } = req.body;
+
+//   pool.query(queries.checkBlogExists, [title], (error, results) => {
+//     if (results.rows.length) {
+//       res.send("Blog already exists!");
+//     } else {
+//       // Insert blog details
+//       pool.query(
+//         queries.addBlog,
+//         [title, details],
+//         (error, results) => {
+//           if (error) throw error;
+
+//           // Get the inserted blog's ID
+//           const blogId = results.insertId;
+
+//           // Prepare image data for insertion
+//           const imageValues = blog_images.map((image) => [blogId, image]);
+
+//           // Insert image URLs
+//           pool.query(
+//             queries.addBlogImages,
+//             [imageValues],
+//             (error, results) => {
+//               if (error) throw error;
+//               res.status(201).send("Blog created successfully!");
+//             }
+//           );
+//         }
+//       );
+//     }
+//   });
+// };
+
+
+// const addBlog = (req, res) => {
+//   const { title, details, blog_images } = req.body;
+
+  
+
+//   pool.query(checkBlogExistsQuery, [title], (error, results) => {
+//     if (results.rows.length) {
+//       res.send("Blog already exists!");
+//     } else {
+//       // Insert blog details
+//       pool.query(addBlogQuery, [title, details], (error, results) => {
+//         if (error) throw error;
+
+//         const blogId = results.rows[0].id;
+
+//         // Prepare image data for insertion
+//         const imageInserts = blog_images.map((image) => [
+//           blogId,
+//           image,
+//         ]);
+
+//         // Insert image URLs
+//         pool.query(addBlogImagesQuery, imageInserts, (error, results) => {
+//           if (error) throw error;
+//           res.status(201).send("Blog created successfully!");
+//         });
+//       });
+//     }
+//   });
+// };
+
+
+const addBlog = (req, res) => {
+  const { title, details, blog_images } = req.body;
+
+  const checkBlogExistsQuery = `
+    SELECT id
+    FROM blogs
+    WHERE title = '${title}';
+  `;
+
+  const addBlogQuery = `
+    INSERT INTO blogs (user_id, title, details)
+    VALUES (1, '${title}', '${details}')
+    RETURNING id;
+  `;
+
+  const addBlogImagesQuery = `
+    INSERT INTO blog_images (blog_id, image_url)
+    VALUES ($1, $2);
+  `;
+
+  pool.query(checkBlogExistsQuery, (error, results) => {
+    if (results.rows.length) {
+      res.send("Blog already exists!");
+    } else {
+      // Insert blog details
+      pool.query(addBlogQuery, (error, results) => {
+        if (error) throw error;
+
+        const blogId = results.rows[0].id;
+
+        // Prepare image data for insertion
+        const imageInserts = blog_images.map((image) => [
+          blogId,
+          image,
+        ]);
+
+        // Insert image URLs
+        pool.query(addBlogImagesQuery, imageInserts, (error, results) => {
+          if (error) throw error;
+          res.status(201).send("Blog created successfully!");
         });
-
-        
-    });
+      });
+    }
+  });
 };
+
 
 const removeBlog =async (req,res) =>{
     const id = parseInt(req.params.id);

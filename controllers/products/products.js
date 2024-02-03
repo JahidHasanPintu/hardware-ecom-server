@@ -1,92 +1,152 @@
 const pool = require("../../config/db");
 const queries = require("./productsQueries");
-
+const util = require('util');
+const fs = require('fs');
 
 const getAllProducts = async (req, res) => {
-  const page = req.query.page ? parseInt(req.query.page, 10) : 1; // Current page number
-  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10; // Number of records to show per page
-  const offset = (page - 1) * limit; // Offset to skip the previous pages
+  const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+  const offset = (page - 1) * limit;
 
-  const { search, brand_id, cat_id, subcat_id } = req.query;
+  const { search, brand_id, cat_id, subcat_id, sort, offer } = req.query;
 
   let query = `
-    SELECT p.*, 
-      b.brand_name, 
-      c.cat_name, 
-      s.subcat_name 
-    FROM 
-      public.products p 
-      LEFT JOIN public.brands b ON p.brand_id = b.brand_id 
-      LEFT JOIN public.categories c ON p.cat_id = c.cat_id 
-      LEFT JOIN public.subcategories s ON p.subcat_id = s.subcat_id
+  SELECT 
+  p.*, 
+  b.brand_name, 
+  c.cat_name, 
+  s.subcat_name,
+  (SELECT COUNT(*) FROM product_reviews r WHERE r.product_id = p.id) AS total_reviews,
+  (SELECT AVG(rating) FROM product_reviews r WHERE r.product_id = p.id) AS average_rating
+FROM 
+  products p 
+  LEFT JOIN brands b ON p.brand_id = b.id 
+  LEFT JOIN categories c ON p.cat_id = c.id 
+  LEFT JOIN subcategories s ON p.subcat_id = s.id
     `;
 
   const values = [];
 
-  // If search query parameter is provided, add WHERE clause to search by name
   if (search) {
     query += `
-      WHERE name ILIKE $${values.length + 1}
+      WHERE product_name LIKE ?
     `;
     values.push(`%${search}%`);
   }
 
-  // If brand_id query parameter is provided, add WHERE clause to filter by brand_id
   if (brand_id) {
+    const brandIds = brand_id.split(',');
+    const brandIdParams = brandIds.map(() => '?').join(',');
     query += `
-      ${search ? "AND" : "WHERE"} p.brand_id = $${values.length + 1}
-    `;
-    values.push(brand_id);
+      ${search ? 'AND' : 'WHERE'} p.brand_id IN (${brandIdParams})`;
+    values.push(...brandIds);
   }
 
-  // If cat_id query parameter is provided, add WHERE clause to filter by cat_id
   if (cat_id) {
+    const catIds = cat_id.split(',');
+    const catIdParams = catIds.map(() => '?').join(',');
     query += `
-      ${search || brand_id ? "AND" : "WHERE"} p.cat_id = $${values.length + 1}
-    `;
-    values.push(cat_id);
+      ${search || brand_id ? 'AND' : 'WHERE'} p.cat_id IN (${catIdParams})`;
+    values.push(...catIds);
   }
 
   if (subcat_id) {
     query += `
-      ${search || brand_id || cat_id ? "AND" : "WHERE"} p.subcat_id = $${values.length + 1}
+      ${search || brand_id || cat_id ? 'AND' : 'WHERE'} p.subcat_id = ?
     `;
     values.push(subcat_id);
   }
+  if (offer) {
+    query += `
+      ${search || brand_id || cat_id || subcat_id ? 'AND' : 'WHERE'} p.is_offer = ?
+    `;
+    values.push(offer);
+  }
+
+  if (sort === 'latest') {
+    query += `
+      ORDER BY created_at DESC
+    `;
+  } else if (sort === 'oldest') {
+    query += `
+      ORDER BY created_at ASC
+    `;
+  } else if (sort === 'popular') {
+    query += `
+      ORDER BY sale_count DESC
+    `;
+  } else {
+    query += `
+      ORDER BY id ASC
+    `;
+  }
+
   query += `
-    ORDER BY id ASC
-    LIMIT $${values.length + 1}
-    OFFSET $${values.length + 2}
+    LIMIT ? OFFSET ?
   `;
   values.push(limit, offset);
 
   const totalCountQuery = `
-  SELECT COUNT(*) as total_count
-  FROM products
-`;
-  try {
-    const result = await pool.query(query, values);
-    const data = result.rows;
-    const totalCountResult = await pool.query(totalCountQuery);
-    const totalCount = parseInt(totalCountResult.rows[0].total_count, 10);
+    SELECT COUNT(*) as total_count
+    FROM products
+  `;
 
-    const products = data.map((product) => ({
-      brand_id: product.brand_id,
+  try {
+    const queryPromise = util.promisify(pool.query).bind(pool);
+
+    const result = await queryPromise(query, values);
+    const data = result;
+
+    const totalCountResult = await queryPromise(totalCountQuery);
+    const totalCount = parseInt(totalCountResult[0].total_count, 10);
+
+    const productIds = data.map(product => product.id);
+    const distinctProductIds = [...new Set(productIds)];
+
+    const imageQuery = `
+      SELECT product_id, image_url
+      FROM product_images
+      WHERE product_id IN (${distinctProductIds.map(() => '?').join(',')})
+    `;
+    const imageValues = distinctProductIds;
+    const imageResult = await queryPromise(imageQuery, imageValues);
+
+    const imageMap = {};
+    imageResult.forEach(row => {
+      const productId = row.product_id;
+      const imageUrl = process.env.BASE_URL + "/" + row.image_url;
+
+      if (!imageMap[productId]) {
+        imageMap[productId] = [];
+      }
+      imageMap[productId].push(imageUrl);
+    });
+
+    const products = data.map(product => ({
+      id: product.id,
+      name: product.product_name,
+      price: product.price,
+      oldPrice: product.old_price,
+      quantity: product.quantity,
+      sale_count: product.sale_count,
+      description: product.description,
+
       brand_name: product.brand_name,
-      cat_id: product.cat_id,
       cat_name: product.cat_name,
+      subcat_name: product.subcat_name,
+
+      cat_id: product.cat_id,
+      subcat_id: product.subcat_id,
+      brand_id: product.brand_id,
+      images: imageMap[product.id] || [],
 
       created_at: product.created_at,
-      description: product.description,
-      id: product.id,
-      images: product.images.map((image) => process.env.BASE_URL + "/" + image),
-      name: product.name,
-      price: product.price,
-      quantity: product.quantity,
-      subcat_id: product.subcat_id,
-      subcat_name: product.subcat_name,
-    }));
+      updated_at: product.updated_at,
+      isOffer: product.is_offer,
+      total_reviews: product.total_reviews,
+      average_rating: product.average_rating,
 
+    }));
 
     res.status(200).json({
       success: true,
@@ -98,118 +158,401 @@ const getAllProducts = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
 
 
-
 const getProductByID = async (req, res) => {
-  const id = parseInt(req.params.id);
-  pool.query(queries.getProductByID, [id], (error, results) => {
-    if (error) throw error;
-    res.status(200).json(results.rows);
-  });
+  const productId = req.params.id;
+
+  const productQuery = `
+    SELECT p.*, 
+      b.brand_name, 
+      c.cat_name, 
+      s.subcat_name 
+    FROM 
+      products p 
+      LEFT JOIN brands b ON p.brand_id = b.id 
+      LEFT JOIN categories c ON p.cat_id = c.id 
+      LEFT JOIN subcategories s ON p.subcat_id = s.id
+    WHERE p.id = ?
+  `;
+
+  const variationsQuery = `
+    SELECT pv.variation_id, pv.color, pv.size, pv.stock_quantity as quantity, pv.weight, pv.image as images, pv.price_variation as price
+    FROM product_variations pv
+    WHERE pv.product_id = ?
+  `;
+  const SizeQuery = `
+    SELECT ps.id, ps.size, ps.stock_quantity as quantity
+    FROM product_sizes ps
+    WHERE ps.product_id = ?
+  `;
+
+  const reviewsQuery = `
+    SELECT COUNT(*) AS total_reviews, AVG(rating) AS average_rating
+    FROM product_reviews
+    WHERE product_id = ?
+  `;
+
+  try {
+    const queryPromise = util.promisify(pool.query).bind(pool);
+
+    // Fetch the product with all its information
+    const productResult = await queryPromise(productQuery, [productId]);
+    const product = productResult[0];
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    // Fetch the product variations
+    const variationsResult = await queryPromise(variationsQuery, [productId]);
+    let variationRes = [];
+    const variations = variationsResult.map((row) => {
+      variationRes.push({
+        id: row.variation_id,
+        color: row.color,
+        images: process.env.BASE_URL + "/" + row.images,
+        price: row.price,
+        quantity: row.quantity,
+      })
+    });
+
+    const sizeResult = await queryPromise(SizeQuery, [productId]);
+    const sizes = sizeResult;
+
+    // Fetch the image URLs for the product
+    const imageQuery = `
+      SELECT image_url
+      FROM product_images
+      WHERE product_id = ?
+    `;
+    const imageResult = await queryPromise(imageQuery, [productId]);
+    const imageUrls = imageResult.map((row) => process.env.BASE_URL + "/" + row.image_url);
+
+
+    // Fetch the total number of reviews and average rating
+    const reviewsResult = await queryPromise(reviewsQuery, [productId]);
+    const totalReviews = reviewsResult[0].total_reviews;
+    const averageRating = reviewsResult[0].average_rating;
+
+    // Construct the product object with variations
+    const productObject = {
+      id: product.id,
+      name: product.product_name,
+      brand_name: product.brand_name,
+      cat_name: product.cat_name,
+      subcat_name: product.subcat_name,
+      price: product.price,
+      oldPrice: product.old_price,
+      quantity: product.quantity,
+      sale_count: product.sale_count,
+      warranty: product.warranty,
+      sku: product.sku,
+      cat_id: product.cat_id,
+      subcat_id: product.subcat_id,
+      brand_id: product.brand_id,
+      created_at: product.created_at,
+      updated_at: product.updated_at,
+      images: imageUrls || [],
+      description: product.description,
+      variations: variationRes,
+      sizes: sizes,
+      total_reviews: totalReviews,
+      average_rating: averageRating,
+    };
+
+    res.status(200).json({ success: true, data: productObject });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
 };
 
 
 const addProduct = (req, res) => {
-  const { name, description, price, quantity, cat_id, brand_id, subcat_id } = req.body;
-  // const filePath = req.file.path.replace("public\\", "");
-  // const images = [filePath];
-  // console.log(req); 
-  const images = [];
-  req.files.forEach(file => {
-    const filePath = file.path.replace("public\\", "");
-    images.push(filePath);
-  });
+  const { product_name, price, old_price, quantity, warranty, offer, description, sku, status, brand_id, cat_id, subcat_id, variations, sizes } = req.body;
+  let subCatId = 0,catId=0,brandID=0;
+  if(subcat_id){
+    subCatId=subcat_id;
+  }
+  if(cat_id){
+    catId=cat_id;
+  }
+  if(brand_id){
+    brandID=brand_id;
+  }
 
-  pool.query(queries.checkProductExists, [name], (error, results) => {
-    if (results.rows.length) {
-      res.send("Product name already exist !");
+
+  const variationsArr = JSON.parse(variations);
+  const sizeArr = JSON.parse(sizes);
+  const addProductQuery = `INSERT INTO products (product_name, price, old_price, quantity, warranty, is_offer, description,sku, status, brand_id, cat_id, subcat_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?)`;
+
+  pool.query(addProductQuery, [product_name, price, old_price, quantity, warranty, offer, description, sku, status, brandID, catId, subCatId], async (addError, addResults) => {
+    if (addError) {
+      throw addError;
     }
-    pool.query(queries.addProduct, [name, description, price, images, quantity, cat_id, brand_id, subcat_id], (error, results) => {
-      if (error) throw error;
-      res.status(201).send("Product created successfully!");
-    });
+    if (addResults) {
+      const product_id = addResults.insertId;
 
+      // Fetch the inserted product's ID
+      const getProductQuery = `SELECT id FROM products WHERE product_name = ?`;
+      pool.query(getProductQuery, [product_name], async (getProductError, getProductResults) => {
+        if (getProductError) {
+          throw getProductError;
+        }
+        if (getProductResults) {
+          const product_id = getProductResults[0].id;
 
+          // Insert image URLs into the 'product_images' table
+          await Promise.all(
+            req.files.map(async (file) => {
+              const filePath = file.path.replace("public\\", "");
+              await pool.query(
+                `INSERT INTO product_images (product_id, image_url) VALUES (?, ?)`,
+                [product_id, filePath]
+              );
+            })
+          );
+          await Promise.all(
+            sizeArr.map(async (size) => {
+
+              const colorId = 0;
+              const Ssize = size.size;
+              const Squantity = size.quantity;
+              await pool.query(
+                `INSERT INTO product_sizes (product_id,color_id,size, stock_quantity) VALUES (?, ?, ?, ?)`,
+                [product_id, colorId, Ssize, Squantity]
+              );
+            })
+          );
+        }
+        const productId = addResults.insertId;
+        res.status(201).json({ productId: productId, message: "Product created successfully!" });
+      });
+    }
   });
 };
 
+const addVariations = async (req, res) => {
+  const { product_id, color, quantity, price } = req.body;
+  const images = req.files[0]?.path?.replace("public\\", ""); // An array of image files, you can access individual files using req.files[index]
+
+  await pool.query(
+    `INSERT INTO product_variations (product_id,color, stock_quantity,price_variation,image) VALUES (?, ?, ?, ?, ?)`,
+    [product_id, color, quantity, price, images]
+  );
+
+  res.status(201).send("Variations added successfully!");
+};
+
+
+
 const removeProduct = async (req, res) => {
-  const id = parseInt(req.params.id);
-  pool.query(queries.getProductByID, [id], (error, results) => {
-    const noUserFound = !results.rows.length;
-    if (noUserFound) {
-      res.send("Product does not exist");
-    }
-    pool.query(queries.removeProduct, [id], (error, results) => {
+  const productId = req.params.id;
 
-      if (error) throw error;
-      res.status(200).json({ message: "Product deleted successfully!" });
+  const deleteProductQuery = `
+    DELETE FROM products
+    WHERE id = ?
+  `;
+
+  const deleteImageQuery = `
+    DELETE FROM product_images
+    WHERE product_id = ?
+  `;
+  const deleteVariation = `
+    DELETE FROM product_variations
+    WHERE product_id = ?
+  `;
+  const deleteSize = `
+    DELETE FROM product_sizes
+    WHERE product_id = ?
+  `;
+
+  const getImageQuery = `
+    SELECT image_url
+    FROM product_images
+    WHERE product_id = ?
+  `;
+
+  try {
+    const queryPromise = util.promisify(pool.query).bind(pool);
+
+    // Fetch the image URLs for the product
+    const imageResult = await queryPromise(getImageQuery, [productId]);
+    const imageUrls = imageResult.map(row => row.image_url);
+
+    // Delete the product from the products table
+    await queryPromise(deleteSize, [productId]);
+    await queryPromise(deleteVariation, [productId]);
+    await queryPromise(deleteProductQuery, [productId]);
+
+    // Delete the related image records from the product_images table
+    await queryPromise(deleteImageQuery, [productId]);
 
 
+    // Delete the image files from the server storage
+    imageUrls.forEach(imageUrl => {
+      const imageName = imageUrl.split('/').pop();
+      const imagePath = `public/images/${imageName}`;
+
+      // Check if the image file exists and delete it
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
     });
-  });
+
+    res.status(200).json({ success: true, message: 'Product removed successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
 };
 
 
 const updateProduct = async (req, res) => {
+  const productId = req.params.id;
+  const { name, brand_id, cat_id, subcat_id, price, old_price, quantity, description, warranty, sku, offer, removedImages, sizes,removedVariations,removedSizes } = req.body;
+  const sizeArr = JSON.parse(sizes);
+
+  console.log(removedVariations,removedSizes);
+
+  const getProductQuery = `
+    SELECT *
+    FROM products
+    WHERE id = ?
+  `;
+
+  const updateProductQuery = `
+    UPDATE products
+    SET ${name !== '' ? 'product_name = ?,' : ''} ${brand_id !== '' ? 'brand_id = ?,' : ''} 
+    ${cat_id !== '' ? 'cat_id = ?,' : ''} ${subcat_id !== '' ? 'subcat_id = ?,' : ''} 
+    ${price !== '' ? 'price = ?,' : ''} ${old_price !== '' ? 'old_price = ?,' : ''} 
+    ${quantity !== '' ? 'quantity = ?,' : ''} ${description !== '' ? 'description = ?,' : ''} 
+    ${warranty !== '' ? 'warranty = ?,' : ''} ${sku !== '' ? 'sku = ?,' : ''} 
+    ${offer !== '' ? 'is_offer = ?,' : ''} 
+    updated_at = NOW()
+    WHERE id = ?
+  `;
+
+  const values = [
+    name, brand_id, cat_id, subcat_id, price, old_price, quantity, description, warranty, sku, offer, productId
+  ].filter(value => value !== '');
+
+  // Split the removedImages string into an array of image URLs
+  const removedImageURLs = removedImages.split(',');
+  const removedVar = removedVariations.split(',');
+  const removedSize = removedSizes.split(',');
+
+  // Remove the base URL from each image URL
+  const formattedRemovedImageURLs = removedImageURLs.map(url =>
+    url.replace(`${process.env.BASE_URL}/`, '')
+
+  );
+
+  const deleteImagesQuery = `
+  DELETE FROM product_images
+  WHERE product_id = ? AND image_url = ?
+`;
+  const deleteVariationQuery = `
+  DELETE FROM product_variations
+  WHERE variation_id = ?
+`;
+  const deleteSizesQuery = `
+  DELETE FROM product_sizes
+  WHERE id = ?
+`;
+
   try {
-    const id = parseInt(req.params.id);
-    const { name, description, price, quantity, cat_id, brand_id, subcat_id } = req.body;
+    const queryPromise = util.promisify(pool.query).bind(pool);
 
-    if (req.file) {
-      const filePath = req.file.path.replace("public\\", "");
+    // Check if the product exists
+    const productResult = await queryPromise(getProductQuery, [productId]);
+    const product = productResult[0];
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    const result = await pool.query(queries.getProductByID, [id]);
-    const existingProduct = result.rows[0];
+    // Validate brand_id, cat_id, and subcat_id before updating
+    const brandExists = await queryPromise('SELECT * FROM brands WHERE id = ?', [brand_id]);
+    const categoryExists = await queryPromise('SELECT * FROM categories WHERE id = ?', [cat_id]);
+    const subcategoryExists = await queryPromise('SELECT * FROM subcategories WHERE id = ?', [subcat_id]);
 
-    if (!existingProduct) {
-      return res.status(404).json({ message: 'Product not found' });
+    if (!brandExists[0]) {
+      return res.status(404).json({ success: false, message: 'Brand not found' });
     }
 
-    const updatedName = name || existingProduct.name;
-    const updatedDescription = description || existingProduct.description;
-    const updatedPrice = price || existingProduct.price;
-    const updatedQuantity = quantity || existingProduct.quantity;
-    const updatedCatId = cat_id || existingProduct.cat_id;
-    const updatedBrandId = brand_id || existingProduct.brand_id;
-    const updatedSubcatId = subcat_id || existingProduct.subcat_id;
+    if (!categoryExists[0]) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
 
-    const updateQuery = `
-      UPDATE products
-      SET
-        name = $1,
-        description = $2,
-        price = $3,
-        quantity = $4,
-        cat_id = $5,
-        brand_id = $6,
-        subcat_id = $7
-      WHERE
-        id = $8
-    `;
+    if (!subcategoryExists[0]) {
+      return res.status(404).json({ success: false, message: 'Subcategory not found' });
+    }
 
-    await pool.query(updateQuery, [
-      updatedName,
-      updatedDescription,
-      updatedPrice,
-      updatedQuantity,
-      updatedCatId,
-      updatedBrandId,
-      updatedSubcatId,
-      id
-    ]);
+    await Promise.all(
+      req.files.map(async (file) => {
+        const filePath = file.path.replace("public\\", "");
+        await pool.query(
+          `INSERT INTO product_images (product_id, image_url) VALUES (?, ?)`,
+          [productId, filePath]
+        );
+      })
+    );
 
-    res.status(200).json({ message: 'Product updated successfully' });
+    await Promise.all(
+      formattedRemovedImageURLs.map(url =>
+        queryPromise(deleteImagesQuery, [productId, url])
+      )
+    );
+    await Promise.all(
+      removedVar.map(id =>
+        queryPromise(deleteVariationQuery, [id])
+      )
+    );
+    await Promise.all(
+      removedSize.map(id =>
+        queryPromise(deleteSizesQuery, [id])
+      )
+    );
+
+    await Promise.all(
+      sizeArr.map(async (size) => {
+
+        const colorId = 1;
+        const Ssize = size.size;
+        const Squantity = size.quantity;
+        await pool.query(
+          `INSERT INTO product_sizes (product_id,color_id,size, stock_quantity) VALUES (?, ?, ?, ?)`,
+          [productId, colorId, Ssize, Squantity]
+        );
+      })
+    );
+
+
+    // Update the product in the database with non-null values
+    await queryPromise(updateProductQuery, [...values, productId]);
+
+
+
+    // await queryPromise(deleteImagesQuery, [productId, formattedRemovedImageURLs]);
+
+
+
+    res.status(200).json({ success: true, message: 'Product updated successfully' });
   } catch (error) {
-    console.error(error.message);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
-}
+};
+
+
+
+
+
 
 
 
@@ -221,5 +564,6 @@ module.exports = {
   addProduct,
   removeProduct,
   updateProduct,
+  addVariations,
 
 };
